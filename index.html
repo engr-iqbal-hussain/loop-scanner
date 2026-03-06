@@ -1,83 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <title>Loop Scanner</title>
-
-<script src="https://unpkg.com/@zxing/library@latest"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
-body{
-font-family:Arial;
-text-align:center;
-padding:20px;
-}
-
-video{
-width:100%;
-max-width:400px;
-border:2px solid black;
-}
+body{font-family:Arial;text-align:center;padding:40px;}
 </style>
-
 </head>
 
 <body>
 
-<h2>Loop Scanner</h2>
+<h2>Loop Folder Scanner</h2>
 
-<video id="video"></video>
+<input type="file" accept="image/*" capture="environment" id="camera">
 
-<p id="result">Scanning...</p>
+<p id="progress"></p>
+<p id="ocrText"></p>
+<p id="loop"></p>
+<p id="status"></p>
 
 <script>
 
-const codeReader = new ZXing.BrowserMultiFormatReader()
+const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/gviz/tq?tqx=out:csv";
 
-const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0"
+document.getElementById("camera").addEventListener("change", function(){
 
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-.then(function(stream){
+document.getElementById("progress").innerHTML="Scanning image...";
 
-document.getElementById("video").srcObject = stream
-document.getElementById("video").play()
+const file = this.files[0];
 
-})
+Tesseract.recognize(file, 'eng', {
+  logger: m => document.getElementById("progress").innerHTML = m.status + " " + Math.floor((m.progress||0)*100) + "%"
+}).then(function(result){
 
-const video = document.getElementById('video')
+let text = result.data.text;
 
-setInterval(() => {
+// Show full OCR output for debugging
+document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>"+text;
 
-const canvas = document.createElement("canvas")
-const ctx = canvas.getContext("2d")
+// Flexible regex: find Rxx-xxx-T-xxx anywhere in text, ignoring spaces/newlines
+let loopPattern = /R\d{2,3}-\d{3}-T-\d{3}/i;
+let match = text.match(loopPattern);
 
-canvas.width = video.videoWidth
-canvas.height = video.videoHeight
-
-ctx.drawImage(video,0,0)
-
-const imageData = canvas.toDataURL("image/png")
-
-Tesseract.recognize(imageData,'eng').then(({data:{text}})=>{
-
-let match = text.match(/R\d{2,3}-\d{3}-T-\d{3}/)
-
-if(match){
-
-let loop = match[0]
-
-document.getElementById("result").innerHTML =
-"Detected: "+loop
-
-window.location.href = sheetURL + "&q=" + loop
-
+if(!match){
+  document.getElementById("loop").innerHTML = "❌ Loop number not detected. Check OCR text above.";
+  return;
 }
 
-})
+let loop = match[0].trim();
+document.getElementById("loop").innerHTML = "✅ Loop Number: "+loop;
 
-},2000)
+// Redirect to Google Sheet with search query for fast filtering
+let sheetSearchURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0&q="+loop;
+document.getElementById("status").innerHTML = "Redirecting to Google Sheet...";
+window.location.href = sheetSearchURL;
 
+});
+
+});
 </script>
-
 </body>
 </html>
