@@ -1,104 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Loop Scanner</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+
 <style>
 body{
 font-family:Arial;
 text-align:center;
-padding:40px;
+padding:20px;
 }
-button,input{
-font-size:18px;
-padding:10px;
+
+video{
+width:100%;
+max-width:400px;
+border:2px solid black;
 }
 </style>
+
 </head>
 
 <body>
 
-<h2>Loop Folder Scanner</h2>
+<h2>Loop Scanner</h2>
 
-<input type="file" accept="image/*" capture="environment" id="camera">
+<video id="video"></video>
 
-<p id="progress"></p>
-<p id="detected"></p>
-<p id="loop"></p>
-<p id="status"></p>
+<p id="result">Scanning...</p>
 
 <script>
 
-const sheetURL =
-"https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/gviz/tq?tqx=out:csv";
+const codeReader = new ZXing.BrowserMultiFormatReader()
 
-document.getElementById("camera").addEventListener("change", function(){
+const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0"
 
-document.getElementById("progress").innerHTML="Scanning image... please wait";
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+.then(function(stream){
 
-const file = this.files[0];
+document.getElementById("video").srcObject = stream
+document.getElementById("video").play()
 
-Tesseract.recognize(
-file,
-'eng'
-).then(function(result){
+})
 
-let text = result.data.text;
+const video = document.getElementById('video')
 
-document.getElementById("detected").innerHTML =
-"Detected Text: <br>"+text;
+setInterval(() => {
 
-const match = text.match(/R\d{2,3}-\d{3}-T-\d{3}/);
+const canvas = document.createElement("canvas")
+const ctx = canvas.getContext("2d")
 
-if(!match){
+canvas.width = video.videoWidth
+canvas.height = video.videoHeight
 
-document.getElementById("loop").innerHTML =
-"Loop number not detected";
+ctx.drawImage(video,0,0)
 
-return;
+const imageData = canvas.toDataURL("image/png")
 
-}
+Tesseract.recognize(imageData,'eng').then(({data:{text}})=>{
 
-let loop = match[0];
+let match = text.match(/R\d{2,3}-\d{3}-T-\d{3}/)
 
-document.getElementById("loop").innerHTML =
-"Loop Number: "+loop;
+if(match){
 
-fetch(sheetURL)
-.then(response => response.text())
-.then(data => {
+let loop = match[0]
 
-let rows = data.split("\n");
+document.getElementById("result").innerHTML =
+"Detected: "+loop
 
-let found=false;
-
-rows.forEach(function(row){
-
-let cols=row.split(",");
-
-if(cols[0] && cols[0].trim()==loop){
-
-found=true;
-
-document.getElementById("status").innerHTML =
-"Status: "+cols[1];
+window.location.href = sheetURL + "&q=" + loop
 
 }
 
-});
+})
 
-if(!found){
-
-document.getElementById("status").innerHTML =
-"Loop found but no status";
-
-}
-
-});
-
-});
-
-});
+},2000)
 
 </script>
 
