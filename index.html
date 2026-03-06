@@ -1,62 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Loop Folder Quick Scanner</title>
+  <title>Loop Folder Auto Scanner</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
   <style>
     body { font-family: Arial; text-align: center; padding: 20px; }
-    input, button { font-size: 16px; padding: 10px; margin: 5px; }
+    input { font-size: 16px; padding: 10px; margin: 5px; }
     p { font-size: 16px; }
   </style>
 </head>
 <body>
 
-<h2>Loop Folder Quick Scanner</h2>
+<h2>Loop Folder Auto Scanner</h2>
 
 <p>Take a picture of the folder (or upload image):</p>
 <input type="file" accept="image/*" capture="environment" id="camera"><br>
 
-<p>Enter detected Loop Number (from photo):</p>
-<input type="text" id="loopInput" placeholder="e.g. R93-500-T-002">
-
-<button id="checkLoop">Go to Sheet</button>
-
+<p id="progress"></p>
+<p id="ocrText"></p>
+<p id="loop"></p>
 <p id="status"></p>
 
 <script>
 const sheetCSV = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/gviz/tq?tqx=out:csv";
 const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0";
 
-document.getElementById("checkLoop").addEventListener("click", function(){
-    const scannedLoop = document.getElementById("loopInput").value.trim().toUpperCase();
+document.getElementById("camera").addEventListener("change", function() {
+    const file = this.files[0];
+    if(!file) return alert("Please upload an image.");
 
-    if(!scannedLoop){
-        alert("Please enter a loop number.");
-        return;
-    }
+    document.getElementById("progress").innerText = "Scanning image...";
 
-    document.getElementById("status").innerText = "Checking loop in Sheet...";
+    Tesseract.recognize(file, 'eng', {
+        logger: m => document.getElementById("progress").innerText = m.status + " " + Math.floor((m.progress||0)*100) + "%"
+    }).then(({ data: { text } }) => {
 
-    fetch(sheetCSV)
-    .then(res => res.text())
-    .then(data => {
-        const rows = data.split("\n");
-        let found = false;
-        for(let r of rows){
-            const loopInSheet = r.split(",")[0].trim().toUpperCase();
-            if(loopInSheet === scannedLoop){
-                found = true;
-                break;
+        document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>" + text;
+
+        // Automatically extract loop number after "Instrument Loop No:"
+        const match = text.match(/Instrument Loop No[:\s]*([A-Z0-9\-]+)/i);
+        if(!match){
+            document.getElementById("loop").innerText = "❌ Loop number not detected";
+            document.getElementById("status").innerText = "";
+            return;
+        }
+
+        const scannedLoop = match[1].trim().toUpperCase();
+        document.getElementById("loop").innerText = "✅ Detected Loop: " + scannedLoop;
+        document.getElementById("status").innerText = "Checking Sheet...";
+
+        // Check if the loop exists in the sheet
+        fetch(sheetCSV)
+        .then(res => res.text())
+        .then(data => {
+            const rows = data.split("\n");
+            let found = rows.some(r => r.split(",")[0].trim().toUpperCase() === scannedLoop);
+
+            if(found){
+                document.getElementById("status").innerText = "✅ Loop found! Redirecting...";
+                window.location.href = sheetURL + "?search=" + scannedLoop;
+            } else {
+                document.getElementById("status").innerText = "❌ Loop not found in Sheet!";
             }
-        }
+        }).catch(err => {
+            document.getElementById("status").innerText = "❌ Error: " + err;
+        });
 
-        if(found){
-            document.getElementById("status").innerText = "✅ Loop found! Redirecting...";
-            window.location.href = sheetURL + "?search=" + scannedLoop;
-        } else {
-            document.getElementById("status").innerText = "❌ Loop not found in Sheet!";
-        }
     }).catch(err => {
-        document.getElementById("status").innerText = "❌ Error: " + err;
+        document.getElementById("status").innerText = "❌ Error scanning image: " + err;
     });
 });
 </script>
