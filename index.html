@@ -19,10 +19,8 @@
 <p id="progress"></p>
 <p id="ocrText"></p>
 <p id="loop"></p>
-<p id="status"></p>
 
 <script>
-const sheetCSV = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/gviz/tq?tqx=out:csv";
 const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0";
 
 document.getElementById("camera").addEventListener("change", function() {
@@ -37,37 +35,21 @@ document.getElementById("camera").addEventListener("change", function() {
 
         document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>" + text;
 
-        // Automatically extract loop number after "Instrument Loop No:"
+        // Extract loop number after "Instrument Loop No:"
         const match = text.match(/Instrument Loop No[:\s]*([A-Z0-9\-]+)/i);
         if(!match){
             document.getElementById("loop").innerText = "❌ Loop number not detected";
-            document.getElementById("status").innerText = "";
             return;
         }
 
         const scannedLoop = match[1].trim().toUpperCase();
         document.getElementById("loop").innerText = "✅ Detected Loop: " + scannedLoop;
-        document.getElementById("status").innerText = "Checking Sheet...";
 
-        // Check if the loop exists in the sheet
-        fetch(sheetCSV)
-        .then(res => res.text())
-        .then(data => {
-            const rows = data.split("\n");
-            let found = rows.some(r => r.split(",")[0].trim().toUpperCase() === scannedLoop);
-
-            if(found){
-                document.getElementById("status").innerText = "✅ Loop found! Redirecting...";
-                window.location.href = sheetURL + "?search=" + scannedLoop;
-            } else {
-                document.getElementById("status").innerText = "❌ Loop not found in Sheet!";
-            }
-        }).catch(err => {
-            document.getElementById("status").innerText = "❌ Error: " + err;
-        });
+        // Redirect to Google Sheet filtered for this loop
+        window.location.href = sheetURL + "?search=" + scannedLoop;
 
     }).catch(err => {
-        document.getElementById("status").innerText = "❌ Error scanning image: " + err;
+        document.getElementById("loop").innerText = "❌ Error scanning image: " + err;
     });
 });
 </script>
