@@ -1,71 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Loop Scanner</title>
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.18.6"></script>
-  <style>
-    body { font-family: Arial; text-align: center; padding: 20px; }
-    video { width: 100%; max-width: 400px; border: 2px solid black; }
-    p { font-size: 16px; }
-  </style>
+<title>Accurate Loop Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+<style>
+body{font-family:Arial; text-align:center; padding:20px;}
+input{font-size:16px; padding:10px;}
+p{font-size:16px;}
+</style>
 </head>
 <body>
 
-<h2>Loop Folder Scanner</h2>
-<p>Point your camera at the loop folder:</p>
-<video id="video" autoplay></video>
-<p id="result">Scanning...</p>
+<h2>Accurate Loop Scanner</h2>
+<p>Upload a photo of the loop folder:</p>
+<input type="file" accept="image/*" id="camera">
+
+<p id="progress"></p>
+<p id="ocrText"></p>
+<p id="loop"></p>
+<p id="status"></p>
 
 <script>
-  // Your Google Sheet URL
-  const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0";
+const sheetCSV = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/gviz/tq?tqx=out:csv";
+const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0";
 
-  // Start camera
-  const video = document.getElementById('video');
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-    .then(stream => {
-      video.srcObject = stream;
-    })
-    .catch(err => {
-      document.getElementById("result").innerText = "Error accessing camera: " + err;
+document.getElementById("camera").addEventListener("change", function(){
+    const file = this.files[0];
+    if(!file) return alert("Upload a photo");
+
+    document.getElementById("progress").innerHTML = "Scanning image...";
+
+    Tesseract.recognize(file,'eng',{
+        logger: m => document.getElementById("progress").innerHTML = m.status + " " + Math.floor((m.progress||0)*100) + "%"
+    }).then(({data:{text}})=>{
+
+        document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>" + text;
+
+        // Extract text after "Instrument Loop No"
+        let match = text.match(/Instrument Loop No[:\s]*([A-Z0-9\-]+)/i);
+        if(!match){
+            document.getElementById("loop").innerHTML = "❌ Loop number not detected after 'Instrument Loop No:'";
+            return;
+        }
+
+        let scannedLoop = match[1].trim();
+        document.getElementById("loop").innerHTML = "✅ Detected Loop: " + scannedLoop;
+
+        // Fetch sheet CSV and check if loop exists
+        fetch(sheetCSV)
+        .then(res=>res.text())
+        .then(data=>{
+            let rows = data.split("\n");
+            let found = false;
+            for(let r of rows){
+                let loopInSheet = r.split(",")[0].trim();
+                if(loopInSheet === scannedLoop){
+                    found = true;
+                    break;
+                }
+            }
+
+            if(found){
+                document.getElementById("status").innerHTML = "🔗 Loop exists! Redirecting to sheet...";
+                // Redirect to sheet filtered using search query
+                window.location.href = sheetURL + "?search=" + scannedLoop;
+            }else{
+                document.getElementById("status").innerHTML = "❌ Loop not found in sheet!";
+            }
+        });
+
+    }).catch(err=>{
+        document.getElementById("status").innerHTML = "❌ Error scanning: " + err;
     });
-
-  // Create canvas to capture frames
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-
-  // Use ZXing for barcode-style detection (we will simulate text detection using pattern search)
-  const loopRegex = /R\d{2,3}-\d{3}-T-\d{3}/i;
-
-  const checkFrame = () => {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Convert frame to image data URL
-    const dataURL = canvas.toDataURL("image/png");
-
-    // Use Tesseract only on small cropped image for speed (optional) or simulate fast detection
-    Tesseract.recognize(dataURL, 'eng').then(({ data: { text } }) => {
-      const match = text.match(loopRegex);
-      if (match) {
-        const loop = match[0].trim();
-        document.getElementById("result").innerText = "✅ Loop Detected: " + loop;
-
-        // Redirect to Google Sheet filtered to that loop
-        const redirectURL = sheetURL + "?search=" + loop;
-        window.location.href = redirectURL;
-      } else {
-        requestAnimationFrame(checkFrame); // keep scanning
-      }
-    }).catch(() => {
-      requestAnimationFrame(checkFrame); // retry on error
-    });
-  };
-
-  video.addEventListener('loadeddata', () => {
-    requestAnimationFrame(checkFrame);
-  });
+});
 </script>
 
 </body>
