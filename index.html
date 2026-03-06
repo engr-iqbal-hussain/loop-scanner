@@ -35,18 +35,25 @@ document.getElementById("camera").addEventListener("change", function() {
 
         document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>" + text;
 
-        // Extract loop number after "Instrument Loop No:"
-        const match = text.match(/Instrument Loop No[:\s]*([A-Z0-9\-]+)/i);
-        if(!match){
+        // Extract everything after "Instrument Loop No:"
+        const splitText = text.split("Instrument Loop No:");
+        if(splitText.length < 2){
             document.getElementById("loop").innerText = "❌ Loop number not detected";
             return;
         }
 
-        const scannedLoop = match[1].trim().toUpperCase();
+        // Take text after "Instrument Loop No:" and trim whitespace and newlines
+        const scannedLoop = splitText[1].split("\n")[0].trim();
+
+        if(!scannedLoop){
+            document.getElementById("loop").innerText = "❌ Loop number not detected";
+            return;
+        }
+
         document.getElementById("loop").innerText = "✅ Detected Loop: " + scannedLoop;
 
         // Redirect to Google Sheet filtered for this loop
-        window.location.href = sheetURL + "?search=" + scannedLoop;
+        window.location.href = sheetURL + "?search=" + encodeURIComponent(scannedLoop);
 
     }).catch(err => {
         document.getElementById("loop").innerText = "❌ Error scanning image: " + err;
