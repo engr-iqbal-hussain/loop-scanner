@@ -2,7 +2,18 @@
 <html>
 <head>
 <title>Loop Scanner</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+<style>
+body{
+font-family:Arial;
+text-align:center;
+padding:40px;
+}
+button,input{
+font-size:18px;
+padding:10px;
+}
+</style>
 </head>
 
 <body>
@@ -11,6 +22,8 @@
 
 <input type="file" accept="image/*" capture="environment" id="camera">
 
+<p id="progress"></p>
+<p id="detected"></p>
 <p id="loop"></p>
 <p id="status"></p>
 
@@ -21,44 +34,67 @@ const sheetURL =
 
 document.getElementById("camera").addEventListener("change", function(){
 
+document.getElementById("progress").innerHTML="Scanning image... please wait";
+
 const file = this.files[0];
 
 Tesseract.recognize(
 file,
-'eng',
-).then(({ data: { text } }) => {
+'eng'
+).then(function(result){
+
+let text = result.data.text;
+
+document.getElementById("detected").innerHTML =
+"Detected Text: <br>"+text;
 
 const match = text.match(/R\d{2,3}-\d{3}-T-\d{3}/);
 
-if(match){
+if(!match){
+
+document.getElementById("loop").innerHTML =
+"Loop number not detected";
+
+return;
+
+}
 
 let loop = match[0];
 
 document.getElementById("loop").innerHTML =
-"Loop Number: " + loop;
+"Loop Number: "+loop;
 
 fetch(sheetURL)
-.then(res => res.text())
+.then(response => response.text())
 .then(data => {
 
 let rows = data.split("\n");
 
-for(let r of rows){
+let found=false;
 
-if(r.includes(loop)){
+rows.forEach(function(row){
 
-let status = r.split(",")[1];
+let cols=row.split(",");
+
+if(cols[0] && cols[0].trim()==loop){
+
+found=true;
 
 document.getElementById("status").innerHTML =
-"Status: " + status;
-
-}
+"Status: "+cols[1];
 
 }
 
 });
 
+if(!found){
+
+document.getElementById("status").innerHTML =
+"Loop found but no status";
+
 }
+
+});
 
 });
 
