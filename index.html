@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Manual Loop Redirect Test</title>
+  <title>Loop Redirect Test with Image</title>
   <style>
     body { font-family: Arial; text-align: center; padding: 20px; }
     input, button { font-size: 16px; padding: 10px; margin: 5px; }
@@ -9,9 +9,12 @@
 </head>
 <body>
 
-<h2>Manual Loop Test</h2>
+<h2>Loop Folder Test</h2>
 
-<p>Enter Loop Number:</p>
+<p>Upload/take a picture of the folder:</p>
+<input type="file" accept="image/*" capture="environment" id="camera"><br>
+
+<p>Enter Loop Number (from the picture):</p>
 <input type="text" id="loopInput" placeholder="e.g. R93-500-T-002">
 <button id="goLoop">Go to Sheet</button>
 
@@ -21,7 +24,7 @@ const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9
 document.getElementById("goLoop").addEventListener("click", function(){
     const loopNumber = document.getElementById("loopInput").value.trim();
     if(!loopNumber){
-        alert("Please enter a loop number");
+        alert("Please enter the loop number");
         return;
     }
 
