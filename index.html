@@ -1,76 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Accurate Loop Scanner</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-<style>
-body{font-family:Arial; text-align:center; padding:20px;}
-input{font-size:16px; padding:10px;}
-p{font-size:16px;}
-</style>
+  <title>Loop Folder Quick Scanner</title>
+  <style>
+    body { font-family: Arial; text-align: center; padding: 20px; }
+    input, button { font-size: 16px; padding: 10px; margin: 5px; }
+    p { font-size: 16px; }
+  </style>
 </head>
 <body>
 
-<h2>Accurate Loop Scanner</h2>
-<p>Upload a photo of the loop folder:</p>
-<input type="file" accept="image/*" id="camera">
+<h2>Loop Folder Quick Scanner</h2>
 
-<p id="progress"></p>
-<p id="ocrText"></p>
-<p id="loop"></p>
+<p>Take a picture of the folder (or upload image):</p>
+<input type="file" accept="image/*" capture="environment" id="camera"><br>
+
+<p>Enter detected Loop Number (from photo):</p>
+<input type="text" id="loopInput" placeholder="e.g. R93-500-T-002">
+
+<button id="checkLoop">Go to Sheet</button>
+
 <p id="status"></p>
 
 <script>
 const sheetCSV = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/gviz/tq?tqx=out:csv";
 const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0";
 
-document.getElementById("camera").addEventListener("change", function(){
-    const file = this.files[0];
-    if(!file) return alert("Upload a photo");
+document.getElementById("checkLoop").addEventListener("click", function(){
+    const scannedLoop = document.getElementById("loopInput").value.trim().toUpperCase();
 
-    document.getElementById("progress").innerHTML = "Scanning image...";
+    if(!scannedLoop){
+        alert("Please enter a loop number.");
+        return;
+    }
 
-    Tesseract.recognize(file,'eng',{
-        logger: m => document.getElementById("progress").innerHTML = m.status + " " + Math.floor((m.progress||0)*100) + "%"
-    }).then(({data:{text}})=>{
+    document.getElementById("status").innerText = "Checking loop in Sheet...";
 
-        document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>" + text;
-
-        // Extract text after "Instrument Loop No"
-        let match = text.match(/Instrument Loop No[:\s]*([A-Z0-9\-]+)/i);
-        if(!match){
-            document.getElementById("loop").innerHTML = "❌ Loop number not detected after 'Instrument Loop No:'";
-            return;
+    fetch(sheetCSV)
+    .then(res => res.text())
+    .then(data => {
+        const rows = data.split("\n");
+        let found = false;
+        for(let r of rows){
+            const loopInSheet = r.split(",")[0].trim().toUpperCase();
+            if(loopInSheet === scannedLoop){
+                found = true;
+                break;
+            }
         }
 
-        let scannedLoop = match[1].trim();
-        document.getElementById("loop").innerHTML = "✅ Detected Loop: " + scannedLoop;
-
-        // Fetch sheet CSV and check if loop exists
-        fetch(sheetCSV)
-        .then(res=>res.text())
-        .then(data=>{
-            let rows = data.split("\n");
-            let found = false;
-            for(let r of rows){
-                let loopInSheet = r.split(",")[0].trim();
-                if(loopInSheet === scannedLoop){
-                    found = true;
-                    break;
-                }
-            }
-
-            if(found){
-                document.getElementById("status").innerHTML = "🔗 Loop exists! Redirecting to sheet...";
-                // Redirect to sheet filtered using search query
-                window.location.href = sheetURL + "?search=" + scannedLoop;
-            }else{
-                document.getElementById("status").innerHTML = "❌ Loop not found in sheet!";
-            }
-        });
-
-    }).catch(err=>{
-        document.getElementById("status").innerHTML = "❌ Error scanning: " + err;
+        if(found){
+            document.getElementById("status").innerText = "✅ Loop found! Redirecting...";
+            window.location.href = sheetURL + "?search=" + scannedLoop;
+        } else {
+            document.getElementById("status").innerText = "❌ Loop not found in Sheet!";
+        }
+    }).catch(err => {
+        document.getElementById("status").innerText = "❌ Error: " + err;
     });
 });
 </script>
