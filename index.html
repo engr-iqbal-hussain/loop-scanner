@@ -4,7 +4,18 @@
 <title>Loop Scanner</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
-body{font-family:Arial;text-align:center;padding:40px;}
+body {
+    font-family: Arial;
+    text-align: center;
+    padding: 40px;
+}
+input {
+    font-size: 18px;
+    padding: 10px;
+}
+p {
+    font-size: 16px;
+}
 </style>
 </head>
 
@@ -12,7 +23,8 @@ body{font-family:Arial;text-align:center;padding:40px;}
 
 <h2>Loop Folder Scanner</h2>
 
-<input type="file" accept="image/*" capture="environment" id="camera">
+<p>Upload a picture of the loop folder:</p>
+<input type="file" accept="image/*" id="camera">
 
 <p id="progress"></p>
 <p id="ocrText"></p>
@@ -21,43 +33,50 @@ body{font-family:Arial;text-align:center;padding:40px;}
 
 <script>
 
-const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/gviz/tq?tqx=out:csv";
+const sheetURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0";
 
 document.getElementById("camera").addEventListener("change", function(){
 
-document.getElementById("progress").innerHTML="Scanning image...";
+    const file = this.files[0];
 
-const file = this.files[0];
+    if(!file){
+        alert("Please upload an image.");
+        return;
+    }
 
-Tesseract.recognize(file, 'eng', {
-  logger: m => document.getElementById("progress").innerHTML = m.status + " " + Math.floor((m.progress||0)*100) + "%"
-}).then(function(result){
+    document.getElementById("progress").innerHTML = "Scanning image...";
 
-let text = result.data.text;
+    Tesseract.recognize(file, 'eng', {
+        logger: m => document.getElementById("progress").innerHTML = m.status + " " + Math.floor((m.progress||0)*100) + "%"
+    }).then(({ data: { text } }) => {
 
-// Show full OCR output for debugging
-document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>"+text;
+        document.getElementById("ocrText").innerHTML = "<b>OCR Text:</b><br>" + text;
 
-// Flexible regex: find Rxx-xxx-T-xxx anywhere in text, ignoring spaces/newlines
-let loopPattern = /R\d{2,3}-\d{3}-T-\d{3}/i;
-let match = text.match(loopPattern);
+        // Flexible regex to detect loop number
+        let loopPattern = /R\d{2,3}-\d{3}-T-\d{3}/i;
+        let match = text.match(loopPattern);
 
-if(!match){
-  document.getElementById("loop").innerHTML = "❌ Loop number not detected. Check OCR text above.";
-  return;
-}
+        if(!match){
+            document.getElementById("loop").innerHTML = "❌ Loop number not detected. Check OCR text above.";
+            document.getElementById("status").innerHTML = "";
+            return;
+        }
 
-let loop = match[0].trim();
-document.getElementById("loop").innerHTML = "✅ Loop Number: "+loop;
+        let loop = match[0].trim();
+        document.getElementById("loop").innerHTML = "✅ Loop Number: " + loop;
 
-// Redirect to Google Sheet with search query for fast filtering
-let sheetSearchURL = "https://docs.google.com/spreadsheets/d/1KpQhFdHimHm8rPLZ6519E9ADCUrCeGuYq7HXpLrzzAk/edit#gid=0&q="+loop;
-document.getElementById("status").innerHTML = "Redirecting to Google Sheet...";
-window.location.href = sheetSearchURL;
+        // Redirect to Google Sheet with search query
+        let redirectURL = sheetURL + "?search=" + loop;
+        document.getElementById("status").innerHTML = "Redirecting to Google Sheet...";
+        window.location.href = redirectURL;
+
+    }).catch(err => {
+        document.getElementById("progress").innerHTML = "❌ Error scanning image: " + err;
+    });
 
 });
 
-});
 </script>
+
 </body>
 </html>
